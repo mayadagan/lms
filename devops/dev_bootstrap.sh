@@ -15,7 +15,7 @@ CONFIG_FILE_PATH="${LMSWEB_FOLDER}/config.py"
 CONFIG_EXAMPLE_FILE_PATH="${LMSWEB_FOLDER}/config.py.example"
 DB_BOOTSTRAP_FILE_PATH="${LMSAPP_FOLDER}/lmsdb/bootstrap.py"
 
-python_exec=python
+python_exec=python3
 pip_exec=pip
 
 if ! (test -f "${CONFIG_FILE_PATH}"); then
