@@ -2,7 +2,7 @@ from io import BufferedReader, BytesIO
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
 from typing import Iterator, List, Tuple
-from zipfile import ZipFile
+from zipfile import ZipFile, BadZipFile
 
 from flask import json
 import pytest
@@ -26,6 +26,7 @@ class TestExtractor:
     PY_NO_EXERCISE = 'noexercise.py'
     ZIP_FILES = ('Upload_1.zip', 'zipfiletest.zip')
     ZIP_BOMB_FILE = 'zipbomb.zip'
+    NOT_A_ZIP_FILE = 'not.zip'
 
     def setup_method(self):
         self.ipynb_file = self.ipynb_file()
@@ -66,6 +67,11 @@ class TestExtractor:
             self.zipbomb_file_list, (self.ZIP_BOMB_FILE,),
         ))
 
+        self.not_a_zip_file = self.create_corrupted_zip()
+        self.bad_zip_storage = self.create_zipfile_storage(
+            self.not_a_zip_file, self.NOT_A_ZIP_FILE
+        )
+
     def teardown_method(self):
         self.ipynb_file.close()
         self.image_file.close()
@@ -73,12 +79,14 @@ class TestExtractor:
         self.pyfile_no_exercise_file.close()
         self.zipfile_file.close()
         self.zipbomb_file_list[0].close()
+        self.not_a_zip_file.close()
         for py_file in self.pyfiles_files:
             py_file.close()
         for zip_file in self.zipfiles_extractor_files:
             zip_file.close()
         for bytes_io, _ in self.zipfiles_extractors_bytes_io:
             bytes_io.close()
+
 
     def ipynb_file(self):
         return open(Path(SAMPLES_DIR) / self.IPYNB_NAME, encoding='utf-8')
@@ -93,17 +101,17 @@ class TestExtractor:
         with open(Path(SAMPLES_DIR) / file_name, 'br') as open_file:
             return BytesIO(open_file.read()), file_name
 
-    @staticmethod
+    @staticmethod  
     def zip_files(filenames: Tuple[str, ...]) -> Iterator[BufferedReader]:
         for file_name in filenames:
             yield open(Path(SAMPLES_DIR) / file_name, 'br')
 
-    @staticmethod
+    @staticmethod   
     def create_zipfile_storage(
         opened_file: BufferedReader, filename: str,
     ) -> FileStorage:
-        spooled = SpooledTemporaryFile()
-        spooled.write(opened_file.read())
+        spooled = SpooledTemporaryFile()  
+        spooled.write(opened_file.read())  
         zip_file_storage = FileStorage(spooled)
         zip_file_storage.filename = filename
         opened_file.seek(0)
@@ -116,9 +124,16 @@ class TestExtractor:
         for file, name in zip(files, filesnames):
             yield BytesIO(file.read()), name
 
-    def get_zip_filenames(self):
+    def get_zip_filenames(self):  
         the_zip = ZipFile(f'{SAMPLES_DIR}/{self.IGNORE_FILES_ZIP_NAME}')
         return the_zip.namelist()
+    
+    def create_corrupted_zip(self):
+        with open(Path(SAMPLES_DIR) / self.NOT_A_ZIP_FILE, "wb"):
+            pass
+        return open(Path(SAMPLES_DIR) / self.NOT_A_ZIP_FILE, "br")
+
+        
 
     def test_notebook(self):
         results = list(extractor.Extractor(self.ipynb_storage))
@@ -191,7 +206,7 @@ class TestExtractor:
         json_response_upload = json.loads(
             upload_response.get_data(as_text=True),
         )
-        assert len(json_response_upload['exercise_misses']) == 1
+        assert len(json_response_upload['exercise_misses']) == 1   
         assert len(json_response_upload['exercise_matches']) == 2
         assert upload_response.status_code == 200
 
@@ -240,7 +255,6 @@ class TestExtractor:
         })
         assert fail_upload_response.status_code == 400
 
-
     def test_upload_correct_course(
         self,
         course: Course,
@@ -254,3 +268,9 @@ class TestExtractor:
             'file': self.pyfile_different_course,
         })
         assert success_upload_response.status_code == 200
+
+    def test_bad_zipfile(self):
+        result = zipfilearchive.Ziparchive(to_extract=self.bad_zip_storage)
+        assert result.is_zipfile == False
+
+
